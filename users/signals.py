@@ -10,7 +10,7 @@ from users.models import CustomUser
 
 @receiver(post_save, sender=CustomUser)
 def send_activation_email(sender, instance, created, **kwargs):
-    if created:
+    if created and not instance.is_active and instance.email:
         token = default_token_generator.make_token(instance)
         activation_url = f"{settings.FRONTEND_URL}/users/activate/{instance.id}/{token}/"
 
@@ -19,7 +19,8 @@ def send_activation_email(sender, instance, created, **kwargs):
         recipient_list = [instance.email]
 
         try:
-            send_mail(subject, message,
-                      settings.EMAIL_HOST_USER, recipient_list)
+            from_email = getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@clubhub.com')
+            send_mail(subject, message, from_email, recipient_list)
         except Exception as e:
             print(f"Failed to send email to {instance.email}: {str(e)}")
+

@@ -43,7 +43,11 @@
   <div class="grid grid-cols-3 gap-6">
     {% for event in events|slice:":3" %}
       <a href="{% url 'event-detail' event.id %}" class="border rounded-xl overflow-hidden shadow hover:shadow-lg transition">
-        <img src="{{ event.image.url }}" class="h-40 w-full object-cover" />
+        {% if event.image %}
+          <img src="{{ event.image.url }}" class="h-40 w-full object-cover" />
+        {% else %}
+          <img src="{% static 'images/default_club.png' %}" class="h-40 w-full object-cover" />
+        {% endif %}
         <div class="p-3">
           <h3 class="font-semibold">{{ event.title }}</h3>
         </div>

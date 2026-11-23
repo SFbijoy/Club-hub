@@ -1,18 +1,20 @@
-from django.shortcuts import render,redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from events.forms import EventForm
 from events.models import Event
 from events.models import EventAttendance as EventParticipant
-from django.shortcuts import get_object_or_404
-from django.contrib import messages
-# Create your views here.
 
 def event_list(request):
     events = Event.objects.all().order_by('-date')
     return render(request, 'event_list.html', {'events': events})
-@login_required
+
+@login_required(login_url='sign-in')
 def create_event(request):
+    if not request.user.is_staff and not request.user.is_superuser:
+        messages.error(request, "Only staff members can create events.")
+        return redirect('event-list')
+
     if request.method == 'POST':
         form = EventForm(request.POST, request.FILES)
         if form.is_valid():
@@ -20,19 +22,20 @@ def create_event(request):
             event.created_by = request.user
             event.save()
             messages.success(request, "Event created successfully!")
-            #return redirect('event-detail', event.id)  # adjust name to your event detail view
-            return redirect('home')
+            return redirect('event-detail', event.id)
         else:
             messages.error(request, "Please correct the errors below.")
     else:
         form = EventForm()
     
     return render(request, 'create_event.html', {'event_form': form})
+
+@login_required(login_url='sign-in')
 def update_event(request, event_id):
     event = get_object_or_404(Event, id=event_id)
 
     # Allow creator OR staff
-    if event.created_by != request.user and not request.user.is_staff:
+    if event.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
         messages.error(request, "You are not allowed to edit this event.")
         return redirect('event-detail', event.id)
 
@@ -49,10 +52,11 @@ def update_event(request, event_id):
         'event_form': form,
         'event': event
     })
-@login_required
+
+@login_required(login_url='sign-in')
 def delete_event(request, event_id):
     event = get_object_or_404(Event, id=event_id)
-    if event.created_by != request.user and not request.user.is_staff:
+    if event.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
         messages.error(request, "You are not allowed to delete this event.")
         return redirect('event-detail', event.id)
 
@@ -78,20 +82,27 @@ def event_detail(request, event_id):
         'participants': participants,
     })
 
-
-@login_required
+@login_required(login_url='sign-in')
 def join_event(request, event_id):
     event = get_object_or_404(Event, id=event_id)
-    participant, created = EventParticipant.objects.get_or_create(event=event, user=request.user)
+
+    if event.max_capacity and event.attendees.count() >= event.max_capacity:
+        messages.warning(request, f"'{event.title}' has reached maximum capacity.")
+        return redirect('event-detail', event.id)
+
+    participant, created = EventParticipant.objects.get_or_create(
+        event=event,
+        user=request.user,
+        defaults={'status': 'going'}
+    )
 
     if created:
         messages.success(request, f"You have joined '{event.title}'!")
     else:
         messages.info(request, "You already joined this event.")
-    return redirect('event-detail', event_id=event.id)
+    return redirect('event-detail', event.id)
 
-
-@login_required
+@login_required(login_url='sign-in')
 def leave_event(request, event_id):
     event = get_object_or_404(Event, id=event_id)
     participant = EventParticipant.objects.filter(event=event, user=request.user)
@@ -101,4 +112,5 @@ def leave_event(request, event_id):
         messages.success(request, f"You have left '{event.title}'.")
     else:
         messages.info(request, "You are not part of this event.")
-    return redirect('event-detail', event_id=event.id)
+    return redirect('event-detail', event.id)
+

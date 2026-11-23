@@ -8,12 +8,15 @@ from clubs.models import ClubRole as clubrole
 from users.models import CustomUser
 User= get_user_model()
 class CustomRegisterForm(StyledFormMixin, forms.ModelForm):
-    password1 = forms.CharField(label="Password",widget=forms.PasswordInput)
-    confirm_password = forms.CharField(widget=forms.PasswordInput)
+    email = forms.EmailField(label="Email Address", required=True)
+    password1 = forms.CharField(label="Password", widget=forms.PasswordInput)
+    confirm_password = forms.CharField(label="Confirm Password", widget=forms.PasswordInput)
     username = forms.CharField(label="Username")
+
     class Meta:
-        model= CustomUser
-        fields= ['username', 'first_name', 'last_name', 'email', 'password1', 'confirm_password','contact']
+        model = CustomUser
+        fields = ['username', 'first_name', 'last_name', 'email', 'contact', 'password1', 'confirm_password']
+
     def clean_username(self):
         username = self.cleaned_data.get('username')
         existing_user = User.objects.filter(username=username).first()
@@ -23,23 +26,30 @@ class CustomRegisterForm(StyledFormMixin, forms.ModelForm):
             else:
                 raise forms.ValidationError("This username is already taken.")
         return username
+
     def clean_password1(self):
         password1 = self.cleaned_data.get('password1')
         return password1
+
     def clean_email(self):
-        email= self.cleaned_data.get('email')
-        if User.objects.filter(email=email).exists():
-            raise forms.ValidationError("Email is already in use.")
-        # if not email.endswith('@gmail.com'):
-        #     raise forms.ValidationError("Only Gmail addresses are allowed.")
+        email = self.cleaned_data.get('email')
+        existing_user = User.objects.filter(email=email).first()
+        if existing_user:
+            if not existing_user.is_active:
+                existing_user.delete()
+            else:
+                raise forms.ValidationError("Email is already in use.")
         return email
+
     def clean_contact(self):
         contact = self.cleaned_data.get('contact')
+        if not contact:
+            return contact
 
         contact = contact.replace(' ', '').replace('-', '')
 
         if contact.startswith('+880'):
-            contact= '0' + contact[4:]
+            contact = '0' + contact[4:]
 
         if not re.match(r'^01[3-9]\d{8}$', contact):
             raise forms.ValidationError("Enter a valid Bangladeshi phone number (e.g. 017XXXXXXXX or +88017XXXXXXXX).")
@@ -52,7 +62,7 @@ class CustomRegisterForm(StyledFormMixin, forms.ModelForm):
         confirm_password = cleaned_data.get("confirm_password")
         
         if password1 and confirm_password and password1 != confirm_password:
-            raise forms.ValidationError("Passwords do not match.")
+            self.add_error('confirm_password', "Passwords do not match.")
         
         return cleaned_data        
 """

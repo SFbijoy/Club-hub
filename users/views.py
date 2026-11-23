@@ -12,42 +12,31 @@ from django.db.models import Count, Q
 from django.contrib.auth import get_user_model
 User= get_user_model()
 def sign_up(request):
-    if request.method == 'GET':
-        form = CustomRegisterForm()
-        # ensure CSRF cookie is set and log it for debugging
-        token = get_token(request)
-        print(f"CSRF token set on GET (get_token): {token}")
-        return render(request, 'registration/sign_up.html', {'form': form})
-    elif request.method == 'POST':
+    if request.method == 'POST':
         form = CustomRegisterForm(request.POST)
-        # Debugging: log CSRF tokens from POST and cookies
-        posted = request.POST.get('csrfmiddlewaretoken')
-        cookie = request.COOKIES.get('csrftoken')
-        print(f"CSRF token posted: {posted}")
-        print(f"CSRF cookie: {cookie}")
         if form.is_valid():
             user = form.save(commit=False)
-            print(user)  
             user.set_password(form.cleaned_data.get('password1'))
-            user.is_active= False 
+            user.is_active = False 
             user.save()
-            messages.success(request,"A confirmation email has been sent. Please check your inbox to activate your account.")
+            messages.success(request, "A confirmation email has been sent. Please check your inbox to activate your account.")
             return redirect('sign-in')
-        else:
-            print("Form is not valid")
-            print(form.errors)
-    return render(request, 'registration/sign_up.html', {'form':form})
+    else:
+        form = CustomRegisterForm()
+    return render(request, 'registration/sign_up.html', {'form': form})
 
 def sign_in(request):
-    form = LoginForm()
     if request.method == 'POST':
-        form = LoginForm(data=request.POST)
+        form = LoginForm(request, data=request.POST)
         if form.is_valid():
-            user= form.get_user()
-            login(request,user)
-            return redirect('home')
+            user = form.get_user()
+            login(request, user)
+            next_url = request.GET.get('next') or request.POST.get('next') or 'home'
+            return redirect(next_url)
         else:
-            messages.error(request, "Invalid credentials")
+            messages.error(request, "Invalid username or password.")
+    else:
+        form = LoginForm()
     return render(request, 'registration/login.html', {'form': form})
 
 def activate_user(request, user_id, token):
